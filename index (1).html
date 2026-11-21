@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trip Analysis — Crew Expense &amp; Travel Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['Fraunces', 'serif'],
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            sand: '#FDF8F2',
+            terracotta: '#E06D53',
+            ocean: '#0F4C5C',
+            sunset: '#F4A261',
+            dusk: '#0B192C',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    h1, h2, h3, .font-display {
+      font-family: 'Fraunces', serif;
+    }
+    .sunset-hero {
+      background: linear-gradient(135deg, #0F4C5C 0%, #1E6B7B 45%, #E06D53 85%, #F4A261 100%);
+    }
+    .card-warm {
+      box-shadow: 0 10px 30px -10px rgba(15, 76, 92, 0.08);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(224, 109, 83, 0.45);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-sand text-slate-800 dark:bg-dusk dark:text-slate-100 transition-colors duration-300 min-h-screen">
+
+  <!-- Audio Element supporting both one-name.mp3 and One%20Name.mp3 -->
+  <audio id="mp3Player" loop preload="auto" playsinline>
+    <source src="one-name.mp3" type="audio/mpeg" />
+    <source src="One%20Name.mp3" type="audio/mpeg" />
+  </audio>
+
+  <!-- Sync Notification Toast -->
+  <div id="syncToast" class="hidden fixed bottom-5 right-5 z-50 bg-emerald-700 text-white text-xs sm:text-sm font-semibold px-4 py-3 rounded-2xl shadow-xl border border-emerald-400/40">
+    ✅ Synced!
+  </div>
+
+  <!-- Admin PIN Unlock Modal -->
+  <div id="pinModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6 border border-amber-200/70 dark:border-slate-700 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="pinModalTitle" class="text-lg font-bold">🔐 Admin Lock</h3>
+        <button type="button" onclick="togglePinModal(false)" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+      </div>
+      <p id="pinModalDesc" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+        Enter your 4-digit Admin PIN to unlock editing on this device. Friends without the PIN can view everything in Read-Only mode.
+      </p>
+      <input id="pinInput" type="password" inputmode="numeric" maxlength="8" placeholder="Enter Admin PIN (e.g., 1234)" class="w-full px-4 py-3 rounded-xl bg-sand/70 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-center text-lg font-mono tracking-widest" onkeydown="if(event.key==='Enter') submitPin()" />
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="togglePinModal(false)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold">Cancel</button>
+        <button type="button" onclick="submitPin()" class="px-4 py-2 rounded-xl bg-ocean hover:bg-cyan-900 text-white text-xs font-bold">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cloud Sync Setup Modal (Firebase Realtime DB) -->
+  <div id="cloudModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-7 border border-amber-200/70 dark:border-slate-700 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xl font-bold">☁️ Live Cloud Sync &amp; Admin Setup</h3>
+        <button type="button" onclick="toggleCloudModal()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+      </div>
+      <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+        Connect your <strong>free Firebase Realtime Database URL</strong> so all your devices and friends see live updates automatically. Set an <strong>Admin PIN</strong> so only you can edit!
+      </p>
+      <ol class="text-xs text-slate-600 dark:text-slate-300 space-y-1.5 list-decimal pl-4 bg-sand/80 dark:bg-slate-800/70 p-3.5 rounded-2xl border border-amber-200/60 dark:border-slate-700">
+        <li>Open <strong>console.firebase.google.com</strong> → Create project → <strong>Build → Realtime Database</strong> (Test Mode).</li>
+        <li>Paste your database URL (<code class="text-terracotta">https://your-app-default-rtdb.firebaseio.com</code>) below.</li>
+        <li>Set an <strong>Admin PIN</strong> (default is <code>1998</code> if left blank) so friends open in Read-Only mode.</li>
+      </ol>
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Firebase Realtime Database URL</label>
+          <input id="firebaseUrlInput" type="url" placeholder="https://your-project-default-rtdb.firebaseio.com" class="mt-1 w-full px-3.5 py-2.5 rounded-xl bg-sand/60 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm" />
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Admin Edit PIN (Protects against edits by others)</label>
+          <input id="setupAdminPinInput" type="text" inputmode="numeric" maxlength="8" placeholder="e.g. 1998" class="mt-1 w-full px-3.5 py-2.5 rounded-xl bg-sand/60 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm font-mono" />
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+        <button type="button" onclick="disconnectCloudSync()" class="text-xs text-rose-600 hover:underline font-semibold">Disconnect Cloud</button>
+        <div class="flex gap-2">
+          <button type="button" onclick="toggleCloudModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold">Cancel</button>
+          <button type="button" onclick="saveFirebaseConfig()" class="px-4 py-2 rounded-xl bg-ocean hover:bg-cyan-900 text-white text-xs font-bold">Save &amp; Sync Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Read-Only Mode Banner (Shown when locked for viewers/friends) -->
+  <div id="readOnlyBanner" class="hidden bg-amber-500 text-slate-950 text-xs sm:text-sm py-2 px-4 flex items-center justify-between gap-3 sticky top-0 z-40 shadow">
+    <div class="flex items-center gap-2 font-semibold truncate">
+      <span>🔒 View-Only Mode — Only Admin can add or modify trip expenses.</span>
+    </div>
+    <button type="button" onclick="openUnlockPrompt()" class="bg-slate-900 text-white text-xs font-bold px-3 py-1 rounded-full shrink-0 hover:bg-slate-800 transition">
+      Unlock Admin
+    </button>
+  </div>
+
+  <!-- Opening Anthem Banner -->
+  <div id="audioPromptBanner" class="bg-slate-900/95 text-white text-xs sm:text-sm py-2.5 px-4 flex items-center justify-between gap-3 z-30 backdrop-blur-md border-b border-white/10">
+    <div class="flex items-center gap-2.5 truncate">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-sunset animate-ping shrink-0"></span>
+      <span class="truncate"><strong>Road Trip Anthem:</strong> "Thalaivan Nirandharam" (Jana Nayagan) — tap Play!</span>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" onclick="toggleAudio(true)" class="bg-terracotta hover:bg-orange-600 text-white font-semibold px-3.5 py-1 rounded-full text-xs transition shadow">
+        ▶ Play Track
+      </button>
+      <button type="button" onclick="dismissBanner()" class="text-slate-400 hover:text-white px-1.5 text-lg leading-none" title="Dismiss">&times;</button>
+    </div>
+  </div>
+
+  <!-- Sunset Hero & Trip Switcher -->
+  <header class="sunset-hero text-white relative overflow-hidden">
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.18),transparent_50%)] pointer-events-none"></div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 relative z-10">
+
+      <!-- Saved Trips & Sync Bar -->
+      <div class="bg-black/25 backdrop-blur-md border border-white/20 rounded-2xl p-3.5 mb-7 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-200">📁 Saved Trips:</span>
+          <select id="tripSelector" onchange="switchTrip(this.value)" class="bg-white text-slate-900 font-bold text-xs sm:text-sm rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-sunset"></select>
+          <button type="button" onclick="createNewTripPrompt()" class="admin-only bg-sunset hover:bg-amber-300 text-slate-950 font-bold text-xs px-3 py-2 rounded-xl transition">
+            + New Trip
+          </button>
+          <button type="button" onclick="renameCurrentTrip()" class="admin-only bg-white/15 hover:bg-white/25 text-white font-semibold text-xs px-3 py-2 rounded-xl border border-white/20 transition" title="Rename Trip">
+            ✏️ Rename
+          </button>
+          <button type="button" onclick="deleteCurrentTrip()" class="admin-only bg-rose-600/80 hover:bg-rose-600 text-white font-semibold text-xs px-3 py-2 rounded-xl transition" title="Delete Trip">
+            🗑️
+          </button>
+        </div>
+
+        <!-- Sync, Lock & Share Controls -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="manualRefreshFromCloud()" id="refreshCloudBtn" class="hidden bg-white/15 hover:bg-white/25 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/25 transition" title="Pull latest changes from cloud">
+            🔄 Sync Now
+          </button>
+          <button type="button" onclick="toggleAdminLock()" id="adminLockBtn" class="bg-white/15 hover:bg-white/25 text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-white/25 transition">
+            🔓 Admin Unlocked
+          </button>
+          <button type="button" onclick="toggleCloudModal()" id="cloudStatusBtn" class="bg-white/15 hover:bg-white/25 text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-white/25 transition flex items-center gap-1.5">
+            ☁️ Setup Cloud
+          </button>
+          <button type="button" onclick="copyCleanTripLink()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl transition shadow flex items-center gap-1.5">
+            🔗 Share Link
+          </button>
+          <button type="button" onclick="exportTripJson()" class="bg-white/15 hover:bg-white/25 text-white font-semibold text-xs px-2.5 py-2 rounded-xl border border-white/20 transition" title="Download Backup JSON">
+            ⬇
+          </button>
+          <label class="admin-only bg-white/15 hover:bg-white/25 text-white font-semibold text-xs px-2.5 py-2 rounded-xl border border-white/20 transition cursor-pointer" title="Restore Backup JSON">
+            ⬆
+            <input type="file" accept=".json" onchange="importTripJson(event)" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-black/20 backdrop-blur-sm px-3.5 py-1 rounded-full text-xs font-semibold tracking-wider uppercase mb-3 border border-white/15">
+            <span>🧭 Group Travel &amp; Expense Ledger</span>
+            <span>•</span>
+            <span id="tripDatesDisplay" contenteditable="true" onblur="saveTripMeta()" class="outline-none border-b border-dashed border-white/70 cursor-text">Dates</span>
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-bold tracking-tight">
+            Trip Analysis
+          </h1>
+          <p class="mt-2 text-amber-50/90 max-w-xl text-sm sm:text-base">
+            Track trip-wise expenses, split bills accurately, save itineraries, and keep every trip organized in one place.
+          </p>
+        </div>
+
+        <!-- Live Stats & Dusk Toggle -->
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="bg-white/15 backdrop-blur-md rounded-2xl px-5 py-3.5 border border-white/25">
+            <div class="text-[11px] uppercase tracking-wider text-amber-200 font-semibold">Trip Total Spend</div>
+            <div id="heroTotalSpend" class="text-2xl sm:text-3xl font-bold mt-0.5">₹0</div>
+          </div>
+          <div class="bg-white/15 backdrop-blur-md rounded-2xl px-5 py-3.5 border border-white/25">
+            <div class="text-[11px] uppercase tracking-wider text-amber-200 font-semibold">Per Person Share</div>
+            <div id="heroPerPerson" class="text-2xl sm:text-3xl font-bold mt-0.5">₹0</div>
+          </div>
+          <button type="button" onclick="toggleDarkMode()" class="bg-slate-900/35 hover:bg-slate-900/55 border border-white/25 px-4 py-3.5 rounded-2xl text-sm font-semibold transition flex items-center gap-2">
+            <span id="themeIcon">🌙</span>
+            <span id="themeLabel">Dusk Mode</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Editable Crew Hub -->
+      <div class="mt-8 pt-6 border-t border-white/20">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-100">Trip Crew (<span id="crewCount">0</span>)</span>
+          <div class="admin-only flex items-center gap-2">
+            <input id="newMemberInput" type="text" placeholder="Add friend name..." class="bg-white/15 placeholder-white/70 text-white text-xs rounded-full px-3.5 py-1.5 border border-white/30 focus:outline-none focus:ring-2 focus:ring-sunset" onkeydown="if(event.key==='Enter') addCrewMember()" />
+            <button type="button" onclick="addCrewMember()" class="bg-sunset text-slate-950 font-bold text-xs px-3.5 py-1.5 rounded-full hover:bg-amber-300 transition shadow-sm">+ Add</button>
+          </div>
+        </div>
+        <div id="crewList" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+    <!-- 1. Expense Tracker, Category Breakdown & Quick Bill Calculator -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-white dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 card-warm border border-amber-200/70 dark:border-slate-800 space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-terracotta">Trip Spending Analysis</span>
+            <h2 class="text-2xl sm:text-3xl font-bold mt-0.5"><span id="ledgerTripTitle">Trip</span> — Expenses &amp; Split</h2>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="copyCleanTripLink()" class="bg-ocean hover:bg-cyan-900 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-sm">
+              🔗 Copy Share Link
+            </button>
+            <button type="button" onclick="copyWhatsAppSummary()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl transition shadow-sm">
+              📋 WhatsApp Text
+            </button>
+          </div>
+        </div>
+
+        <div id="categoryBreakdownBar" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5"></div>
+
+        <!-- Log Expense Form (Admin Only) -->
+        <div class="admin-only grid grid-cols-1 sm:grid-cols-4 gap-3 bg-sand/80 dark:bg-slate-800/70 p-4 rounded-2xl border border-amber-200/60 dark:border-slate-700">
+          <input id="expTitle" type="text" placeholder="Expense item (e.g., Hotel, Fuel, Dinner)" class="sm:col-span-2 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+          <input id="expAmount" type="number" placeholder="Amount (₹)" class="px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+          <select id="expCategory" class="px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm">
+            <option value="Food & Cafe">🍽️ Food &amp; Cafe</option>
+            <option value="Stay & Resort">🏡 Stay &amp; Resort</option>
+            <option value="Travel & Fuel">🛵 Travel &amp; Fuel</option>
+            <option value="Activities & Tickets">🎟️ Activities &amp; Tickets</option>
+            <option value="Other">🧾 Other</option>
+          </select>
+
+          <div class="sm:col-span-2 flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-500 shrink-0">Paid by:</label>
+            <select id="expPaidBy" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm"></select>
+          </div>
+          <div class="sm:col-span-2">
+            <button type="button" onclick="addExpense()" class="w-full bg-ocean hover:bg-cyan-900 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm">
+              + Add Expense
+            </button>
+          </div>
+        </div>
+
+        <div id="expenseList" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+
+        <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-700">
+          <h3 class="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Member Contribution Analysis</h3>
+          <div id="memberStatsGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"></div>
+        </div>
+
+        <div class="bg-amber-50/90 dark:bg-slate-800/80 p-4 rounded-2xl border border-amber-200/80 dark:border-slate-700">
+          <h3 class="font-bold text-xs uppercase tracking-wider text-ocean dark:text-amber-300 mb-2">Who Owes Whom (Simplified Transfers)</h3>
+          <div id="settlementList" class="space-y-1.5 text-sm"></div>
+        </div>
+      </div>
+
+      <!-- Quick Bill Calculator -->
+      <div class="bg-white dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 card-warm border border-amber-200/70 dark:border-slate-800 flex flex-col justify-between">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-ocean dark:text-cyan-400">Arithmetic Helper</span>
+          <h2 class="text-2xl font-bold mt-0.5 mb-4">Quick Bill Calculator</h2>
+
+          <div class="bg-slate-900 text-white p-4 rounded-2xl text-right mb-4 shadow-inner">
+            <div id="calcHistory" class="text-xs text-slate-400 h-4 truncate"></div>
+            <div id="calcDisplay" class="text-3xl font-mono font-bold tracking-tight overflow-x-auto">0</div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-2 text-sm font-bold">
+            <button type="button" onclick="calcClear()" class="col-span-2 bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 py-3 rounded-xl hover:opacity-90">AC</button>
+            <button type="button" onclick="calcBackspace()" class="bg-slate-100 dark:bg-slate-800 py-3 rounded-xl hover:opacity-80">⌫</button>
+            <button type="button" onclick="calcInput('/')" class="bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 py-3 rounded-xl">÷</button>
+
+            <button type="button" onclick="calcInput('7')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">7</button>
+            <button type="button" onclick="calcInput('8')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">8</button>
+            <button type="button" onclick="calcInput('9')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">9</button>
+            <button type="button" onclick="calcInput('*')" class="bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 py-3 rounded-xl">×</button>
+
+            <button type="button" onclick="calcInput('4')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">4</button>
+            <button type="button" onclick="calcInput('5')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">5</button>
+            <button type="button" onclick="calcInput('6')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">6</button>
+            <button type="button" onclick="calcInput('-')" class="bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 py-3 rounded-xl">−</button>
+
+            <button type="button" onclick="calcInput('1')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">1</button>
+            <button type="button" onclick="calcInput('2')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">2</button>
+            <button type="button" onclick="calcInput('3')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">3</button>
+            <button type="button" onclick="calcInput('+')" class="bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 py-3 rounded-xl">+</button>
+
+            <button type="button" onclick="calcInput('0')" class="col-span-2 bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">0</button>
+            <button type="button" onclick="calcInput('.')" class="bg-slate-50 dark:bg-slate-800/60 py-3 rounded-xl">.</button>
+            <button type="button" onclick="calcEquals()" class="bg-terracotta text-white py-3 rounded-xl hover:bg-orange-600">=</button>
+          </div>
+        </div>
+
+        <button type="button" onclick="sendCalcToExpense()" class="admin-only mt-4 w-full bg-ocean/10 hover:bg-ocean/20 dark:bg-cyan-950/60 text-ocean dark:text-cyan-300 font-bold py-2.5 rounded-xl text-xs transition">
+          ↑ Send Total to Expense Form
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. Trip Spots & Saved Places -->
+    <section class="bg-white dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 card-warm border border-amber-200/70 dark:border-slate-800">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-ocean dark:text-cyan-400">Trip Planner</span>
+          <h2 class="text-2xl sm:text-3xl font-bold mt-0.5">Saved Spots, Food &amp; Stays</h2>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="setGuideTab('Places')" id="tab-Places" class="guide-tab px-4 py-2 rounded-xl text-sm font-semibold bg-ocean text-white transition">📍 Sightseeing</button>
+          <button type="button" onclick="setGuideTab('Food')" id="tab-Food" class="guide-tab px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 transition">🍽️ Food &amp; Cafes</button>
+          <button type="button" onclick="setGuideTab('Resorts')" id="tab-Resorts" class="guide-tab px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 transition">🏡 Stays &amp; Resorts</button>
+          <button type="button" onclick="toggleAddSpotModal()" class="admin-only px-3.5 py-2 rounded-xl text-sm font-semibold border border-terracotta text-terracotta hover:bg-terracotta hover:text-white transition">+ Add Spot</button>
+        </div>
+      </div>
+
+      <div id="addSpotDrawer" class="hidden mt-5 p-4 rounded-2xl bg-amber-50/80 dark:bg-slate-800/80 border border-amber-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-5 gap-3">
+        <select id="spotCategory" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm">
+          <option value="Places">Sightseeing</option>
+          <option value="Food">Food &amp; Cafes</option>
+          <option value="Resorts">Stays &amp; Resorts</option>
+        </select>
+        <input id="spotName" type="text" placeholder="Place Name" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+        <input id="spotTag" type="text" placeholder="Tag (e.g. Sunset / Day 1)" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+        <input id="spotDesc" type="text" placeholder="Short note" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+        <button type="button" onclick="addCustomSpot()" class="bg-terracotta hover:bg-orange-600 text-white font-semibold rounded-xl px-4 py-2 text-sm">Save Spot</button>
+      </div>
+
+      <div id="guideCardsGrid" class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </section>
+
+    <!-- 3. Road Trip Jukebox -->
+    <section class="bg-white dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 card-warm border border-amber-200/70 dark:border-slate-800">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-terracotta">Road Trip Jukebox</span>
+          <h2 class="text-2xl sm:text-3xl font-bold mt-0.5">Trip Anthems &amp; Travel Playlist</h2>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 bg-amber-50/90 dark:bg-slate-800 p-3.5 rounded-2xl border border-amber-200/70 dark:border-slate-700">
+          <button type="button" id="playPauseBtn" onclick="toggleAudio()" class="bg-terracotta hover:bg-orange-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition">
+            <span id="playIcon">▶</span>
+            <span id="playBtnText">Play Default</span>
+          </button>
+          <div class="text-xs min-w-[180px]">
+            <div id="nowPlayingTitle" class="font-bold text-slate-900 dark:text-white">Thalaivan Nirandharam (Jana Nayagan)</div>
+            <div id="nowPlayingSub" class="text-slate-500 dark:text-slate-400">Anirudh Ravichander, Vijay • Default Track</div>
+          </div>
+          <select id="synthModeSelect" onchange="switchSynthMode()" class="ml-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold">
+            <option value="mp3">🎵 Default MP3 Track</option>
+            <option value="lofi">🌅 Road Trip Lo-Fi</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="admin-only bg-sand/80 dark:bg-slate-800/70 p-4 rounded-2xl border border-amber-200/60 dark:border-slate-700 space-y-3">
+          <h3 class="font-bold text-base">Add Song to Playlist</h3>
+          <input id="songTitle" type="text" placeholder="Song Name" class="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+          <input id="songArtist" type="text" placeholder="Artist / Movie" class="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+          <input id="songLink" type="url" placeholder="YouTube / Spotify Link (optional)" class="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm" />
+          <div class="flex gap-2">
+            <select id="songVibe" class="flex-1 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm">
+              <option value="Mass / Hype">🔥 Mass / Hype</option>
+              <option value="Sunset Chill">🌅 Sunset Chill</option>
+              <option value="Night Drive">🌌 Night Drive</option>
+              <option value="Bonfire">🪵 Bonfire</option>
+            </select>
+            <button type="button" onclick="addSong()" class="bg-ocean hover:bg-cyan-900 text-white font-semibold px-4 py-2 rounded-xl text-sm transition">
+              + Add
+            </button>
+          </div>
+        </div>
+
+        <div id="songQueueCol" class="lg:col-span-2 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Crew Queue (<span id="songCount">0</span> songs)</span>
+            <div class="flex gap-1.5 text-xs">
+              <button type="button" onclick="filterSongs('ALL')" class="song-filter px-3 py-1 rounded-full bg-ocean text-white font-semibold">All</button>
+              <button type="button" onclick="filterSongs('Mass / Hype')" class="song-filter px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">Mass</button>
+              <button type="button" onclick="filterSongs('Sunset Chill')" class="song-filter px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">Chill</button>
+              <button type="button" onclick="filterSongs('Night Drive')" class="song-filter px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">Drive</button>
+            </div>
+          </div>
+          <div id="songQueueList" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Notes & Packing Checklist -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 card-warm border border-amber-200/70 dark:border-slate-800 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-terracotta">Trip Scratchpad</span>
+            <h2 class="text-2xl font-bold mt-0.5">Crew Notes &amp; Booking Info</h2>
+          </div>
+          <span id="notesSavedBadge" class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Auto-saved</span>
+        </div>
+        <textarea id="tripNotes" rows="8" oninput="saveNotes()" class="w-full flex-1 p-4 rounded-2xl bg-amber-50/60 dark:bg-slate-800/70 border border-amber-200/70 dark:border-slate-700 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-terracotta" placeholder="Write bus/train timings, PNR numbers, hotel contacts, or itinerary notes..."></textarea>
+      </div>
+
+      <div class="bg-white dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 card-warm border border-amber-200/70 dark:border-slate-800">
+        <span class="text-xs font-bold uppercase tracking-wider text-ocean dark:text-cyan-400">Trip Readiness</span>
+        <h2 class="text-2xl font-bold mt-0.5 mb-4">Packing &amp; Action Checklist</h2>
+        <div class="admin-only flex gap-2 mb-4">
+          <input id="newCheckInput" type="text" placeholder="Add checklist item..." class="flex-1 px-3.5 py-2 rounded-xl bg-sand/80 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" onkeydown="if(event.key==='Enter') addCheckItem()" />
+          <button type="button" onclick="addCheckItem()" class="bg-terracotta hover:bg-orange-600 text-white font-semibold px-4 py-2 rounded-xl text-sm">Add</button>
+        </div>
+        <div id="checklistContainer" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-500 dark:text-slate-400 py-8 border-t border-amber-200/50 dark:border-slate-800 mt-10">
+    Trip Analysis • Multi-Trip Expense &amp; Travel Hub
+  </footer>
+
+  <script>
+    const STORAGE_KEY = 'trip_analysis_multi_v3';
+    const CLOUD_URL_KEY = 'trip_analysis_firebase_url';
+    const ADMIN_UNLOCKED_KEY = 'trip_analysis_admin_unlocked';
+
+    function createBlankTrip(id, name, dates) {
+      return {
+        id,
+        name,
+        tripDates: dates || 'Weekend Trip',
+        crew: ['Bharath', 'Venky', 'Karthik', 'Santhosh', 'Sanjay', 'Priyankar', 'Krishna'],
+        spots: [
+          { category: 'Places', name: 'Main Viewpoint / Sunset Point', tag: 'Day 1 Evening', desc: 'Add your sightseeing spots here or click + Add Spot above.' },
+          { category: 'Food', name: 'Local Breakfast & Coffee Spot', tag: 'Morning Fuel', desc: 'Save cafes and restaurants your crew wants to try.' },
+          { category: 'Resorts', name: 'Group Stay / Homestay', tag: 'Base Camp', desc: 'Save hotel check-in details and Google Maps pins.' }
+        ],
+        expenses: [],
+        notes: '• Add bus/train details, stay address, and booking contacts here.',
+        checklist: [
+          { id: 1, text: 'ID Proof & Driving License', done: false },
+          { id: 2, text: 'Power Bank & Chargers', done: false }
+        ]
+      };
+    }
+
+    const defaultAppState = {
+      adminPin: '1998',
+      updatedAt: Date.now(),
+      activeTripId: 'trip_default_1',
+      trips: [
+        {
+          id: 'trip_default_1',
+          name: 'Weekend Road Trip #1',
+          tripDates: 'Nov 2026',
+          crew: ['Bharath', 'Venky', 'Karthik', 'Santhosh', 'Sanjay', 'Priyankar', 'Krishna'],
+          spots: [
+            { category: 'Places', name: 'Sunset Cliff & Beach Trail', tag: 'Day 1', desc: 'Evening coastal walk and sunset session.' },
+            { category: 'Food', name: 'Hilltop Cafe & Local Kitchen', tag: 'Food', desc: 'Group dinner and morning filter coffee spot.' },
+            { category: 'Resorts', name: 'Coastal Group Stay', tag: 'Stay', desc: 'Booked rooms for the crew.' }
+          ],
+          expenses: [
+            { id: 101, title: 'Bike / Cab Rentals', amount: 1500, category: 'Travel & Fuel', paidBy: 'Bharath' },
+            { id: 102, title: 'Group Breakfast', amount: 840, category: 'Food & Cafe', paidBy: 'Venky' }
+          ],
+          notes: '• Connect Cloud Sync in the header so all devices stay synced in real time.',
+          checklist: [
+            { id: 1, text: 'Driving License & ID Cards', done: true },
+            { id: 2, text: 'Power Bank & Charging Cables', done: false }
+          ]
+        }
+      ],
+      songs: [
+        {
+          id: 1,
+          title: 'Thalaivan Nirandharam (Jana Nayagan)',
+          artist: 'Anirudh Ravichander, Vijay',
+          vibe: 'Mass / Hype',
+          link: 'https://www.youtube.com/results?search_query=Thalaivan+Nirandharam+Jana+Nayagan',
+          votes: 15,
+          isDefault: true
+        },
+        {
+          id: 2,
+          title: 'Ilahi',
+          artist: 'Arijit Singh, Pritam',
+          vibe: 'Sunset Chill',
+          link: 'https://www.youtube.com/results?search_query=Ilahi+Yeh+Jawaani+Hai+Deewani',
+          votes: 9
+        },
+        {
+          id: 3,
+          title: 'Nee Kavithaigala',
+          artist: 'Pradeep Kumar',
+          vibe: 'Night Drive',
+          link: 'https://www.youtube.com/results?search_query=Nee+Kavithaigala',
+          votes: 7
+        }
+      ]
+    };
+
+    let appState = null;
+    try {
+      appState = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    } catch (e) {
+      appState = null;
+    }
+    if (!appState || !Array.isArray(appState.trips) || appState.trips.length === 0) {
+      appState = JSON.parse(JSON.stringify(defaultAppState));
+    }
+    if (!appState.adminPin) appState.adminPin = '1998';
+
+    // Determine Admin vs Read-Only mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReadOnlyLink = urlParams.get('mode') === 'view';
+    if (isReadOnlyLink) {
+      localStorage.setItem(ADMIN_UNLOCKED_KEY, 'false');
+    } else if (localStorage.getItem(ADMIN_UNLOCKED_KEY) === null) {
+      // First-time owner on their own browser starts unlocked
+      localStorage.setItem(ADMIN_UNLOCKED_KEY, 'true');
+    }
+
+    function isAdmin() {
+      return localStorage.getItem(ADMIN_UNLOCKED_KEY) === 'true';
+    }
+
+    function applyAdminPermissions() {
+      const admin = isAdmin();
+      document.querySelectorAll('.admin-only').forEach(el => {
+        el.classList.toggle('hidden', !admin);
+      });
+      const lockBtn = document.getElementById('adminLockBtn');
+      const roBanner = document.getElementById('readOnlyBanner');
+      const notesBox = document.getElementById('tripNotes');
+      const datesEl = document.getElementById('tripDatesDisplay');
+      const songCol = document.getElementById('songQueueCol');
+
+      if (admin) {
+        lockBtn.innerHTML = '🔓 Admin Mode';
+        lockBtn.classList.remove('bg-amber-500', 'text-slate-950');
+        lockBtn.classList.add('bg-white/15', 'text-white');
+        roBanner.classList.add('hidden');
+        notesBox.readOnly = false;
+        datesEl.contentEditable = 'true';
+        songCol.classList.remove('lg:col-span-3');
+        songCol.classList.add('lg:col-span-2');
+      } else {
+        lockBtn.innerHTML = '🔒 View Only';
+        lockBtn.classList.add('bg-amber-500', 'text-slate-950');
+        lockBtn.classList.remove('bg-white/15', 'text-white');
+        roBanner.classList.remove('hidden');
+        notesBox.readOnly = true;
+        datesEl.contentEditable = 'false';
+        songCol.classList.remove('lg:col-span-2');
+        songCol.classList.add('lg:col-span-3');
+      }
+    }
+
+    function toggleAdminLock() {
+      if (isAdmin()) {
+        localStorage.setItem(ADMIN_UNLOCKED_KEY, 'false');
+        applyAdminPermissions();
+        renderAll();
+        showToast('🔒 Switched to Read-Only View Mode.');
+      } else {
+        openUnlockPrompt();
+      }
+    }
+
+    function openUnlockPrompt() {
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('pinInput').focus(), 50);
+    }
+
+    function togglePinModal(show) {
+      document.getElementById('pinModal').classList.toggle('hidden', !show);
+    }
+
+    function submitPin() {
+      const entered = document.getElementById('pinInput').value.trim();
+      const expected = String(appState.adminPin || '1998');
+      if (entered === expected) {
+        localStorage.setItem(ADMIN_UNLOCKED_KEY, 'true');
+        togglePinModal(false);
+        applyAdminPermissions();
+        renderAll();
+        showToast('🔓 Admin editing unlocked!');
+      } else {
+        alert('Incorrect Admin PIN.');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('syncToast');
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3500);
+    }
+
+    // --- Cloud Sync (Firebase REST API with Timestamp Conflict Resolution) ---
+    function getFirebaseUrl() {
+      const dbFromUrl = urlParams.get('db');
+      if (dbFromUrl) {
+        const clean = dbFromUrl.replace(/\/+$/, '');
+        localStorage.setItem(CLOUD_URL_KEY, clean);
+        return clean;
+      }
+      return (localStorage.getItem(CLOUD_URL_KEY) || '').replace(/\/+$/, '');
+    }
+
+    function updateCloudBadge() {
+      const url = getFirebaseUrl();
+      const btn = document.getElementById('cloudStatusBtn');
+      const refreshBtn = document.getElementById('refreshCloudBtn');
+      if (url) {
+        btn.innerHTML = '🟢 Cloud Connected';
+        btn.classList.remove('bg-white/15');
+        btn.classList.add('bg-emerald-600/85');
+        refreshBtn.classList.remove('hidden');
+      } else {
+        btn.innerHTML = '☁️ Setup Cloud';
+        btn.classList.add('bg-white/15');
+        btn.classList.remove('bg-emerald-600/85');
+        refreshBtn.classList.add('hidden');
+      }
+    }
+
+    function toggleCloudModal() {
+      if (!isAdmin() && getFirebaseUrl()) {
+        openUnlockPrompt();
+        return;
+      }
+      const modal = document.getElementById('cloudModal');
+      document.getElementById('firebaseUrlInput').value = getFirebaseUrl();
+      document.getElementById('setupAdminPinInput').value = appState.adminPin || '1998';
+      modal.classList.toggle('hidden');
+    }
+
+    async function saveFirebaseConfig() {
+      const raw = document.getElementById('firebaseUrlInput').value.trim().replace(/\/+$/, '');
+      const pin = document.getElementById('setupAdminPinInput').value.trim();
+      if (!raw || !raw.startsWith('https://')) {
+        alert('Please enter a valid Firebase Realtime Database URL starting with https://');
+        return;
+      }
+      localStorage.setItem(CLOUD_URL_KEY, raw);
+      if (pin) appState.adminPin = pin;
+      appState.updatedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+
+      toggleCloudModal();
+      updateCloudBadge();
+      const ok = await pushToCloud();
+      if (ok) {
+        showToast('🟢 Cloud Sync active! Share Link now sends a Read-Only live URL.');
+      } else {
+        alert('Could not reach Firebase URL. Make sure your Realtime Database rules allow read/write (Test Mode).');
+      }
+    }
+
+    function disconnectCloudSync() {
+      localStorage.removeItem(CLOUD_URL_KEY);
+      toggleCloudModal();
+      updateCloudBadge();
+      showToast('Cloud sync disconnected.');
+    }
+
+    async function pushToCloud() {
+      if (!isAdmin()) return false;
+      const dbUrl = getFirebaseUrl();
+      if (!dbUrl) return false;
+      appState.updatedAt = Date.now();
+      try {
+        const res = await fetch(`${dbUrl}/tripanalyser.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(appState)
+        });
+        return res.ok;
+      } catch (e) {
+        console.warn('Cloud push error:', e);
+        return false;
+      }
+    }
+
+    async function pullFromCloud(silent = false) {
+      const dbUrl = getFirebaseUrl();
+      if (!dbUrl) return false;
+      try {
+        // Cache-bust query ensures mobile browsers never return stale cached JSON
+        const res = await fetch(`${dbUrl}/tripanalyser.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return false;
+        const remoteData = await res.json();
+        if (remoteData && Array.isArray(remoteData.trips) && remoteData.trips.length > 0) {
+          const localTime = appState.updatedAt || 0;
+          const remoteTime = remoteData.updatedAt || 0;
+          // Always accept newer cloud data, or force-accept if in Read-Only mode
+          if (!isAdmin() || remoteTime >= localTime || !silent) {
+            const currentActive = appState.activeTripId;
+            appState = remoteData;
+            if (appState.trips.some(t => t.id === currentActive)) {
+              appState.activeTripId = currentActive;
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            applyAdminPermissions();
+            renderAll();
+            if (!silent) showToast('☁️ Synced latest data from cloud!');
+          }
+          return true;
+        }
+      } catch (e) {
+        console.warn('Cloud pull error:', e);
+      }
+      return false;
+    }
+
+    async function manualRefreshFromCloud() {
+      const ok = await pullFromCloud(false);
+      if (!ok) showToast('⚠️ Could not reach cloud database.');
+    }
+
+    // Compact LZ-compressed URL fallback when Cloud Sync isn't configured yet
+    function loadCompactHashTrip() {
+      try {
+        const hash = window.location.hash || '';
+        if (hash.startsWith('#t=') && typeof LZString !== 'undefined') {
+          const json = LZString.decompressFromEncodedURIComponent(hash.slice(3));
+          const sharedTrip = JSON.parse(json);
+          if (sharedTrip && sharedTrip.id && sharedTrip.name) {
+            const idx = appState.trips.findIndex(t => t.id === sharedTrip.id);
+            if (idx >= 0) appState.trips[idx] = sharedTrip;
+            else appState.trips.unshift(sharedTrip);
+            appState.activeTripId = sharedTrip.id;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            showToast('✅ Loaded trip: ' + sharedTrip.name);
+          }
+        }
+      } catch (e) {}
+    }
+
+    function getActiveTrip() {
+      let trip = appState.trips.find(t => t.id === appState.activeTripId);
+      if (!trip) {
+        trip = appState.trips[0];
+        appState.activeTripId = trip.id;
+      }
+      return trip;
+    }
+
+    let currentGuideTab = 'Places';
+    let currentSongFilter = 'ALL';
+    let calcExpression = '';
+
+    function saveState() {
+      if (!isAdmin()) {
+        openUnlockPrompt();
+        return;
+      }
+      appState.updatedAt = Date.now();
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {}
+      renderAll();
+      pushToCloud();
+    }
+
+    // --- Multi-Trip Controls ---
+    function renderTripSelector() {
+      const sel = document.getElementById('tripSelector');
+      sel.innerHTML = appState.trips.map(t => `
+        <option value="${escapeHtml(t.id)}" ${t.id === appState.activeTripId ? 'selected' : ''}>
+          ${escapeHtml(t.name)} (${t.expenses.length} items)
+        </option>
+      `).join('');
+      const active = getActiveTrip();
+      document.getElementById('ledgerTripTitle').innerText = active.name;
+    }
+
+    function switchTrip(tripId) {
+      appState.activeTripId = tripId;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      renderAll();
+    }
+
+    function createNewTripPrompt() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const name = prompt('Enter new trip name (e.g., Hampi, Varkala, Chikmagalur):');
+      if (!name || !name.trim()) return;
+      const dates = prompt('Enter trip dates (optional):', 'Dec 2026') || 'Upcoming Trip';
+      const newId = 'trip_' + Date.now();
+      appState.trips.unshift(createBlankTrip(newId, name.trim(), dates.trim()));
+      appState.activeTripId = newId;
+      saveState();
+      showToast('📁 Created trip: ' + name.trim());
+    }
+
+    function renameCurrentTrip() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      const newName = prompt('Rename current trip:', trip.name);
+      if (!newName || !newName.trim()) return;
+      trip.name = newName.trim();
+      saveState();
+    }
+
+    function deleteCurrentTrip() {
+      if (!isAdmin()) return openUnlockPrompt();
+      if (appState.trips.length <= 1) {
+        alert('At least one trip must remain.');
+        return;
+      }
+      const trip = getActiveTrip();
+      if (!confirm(`Delete "${trip.name}" and all its calculations?`)) return;
+      appState.trips = appState.trips.filter(t => t.id !== trip.id);
+      appState.activeTripId = appState.trips[0].id;
+      saveState();
+    }
+
+    function getCleanShareUrl() {
+      const baseUrl = window.location.origin + window.location.pathname;
+      const dbUrl = getFirebaseUrl();
+      if (dbUrl) {
+        // Friends automatically open in View-Only mode (?mode=view)
+        return `${baseUrl}?db=${encodeURIComponent(dbUrl)}&mode=view`;
+      }
+      const trip = getActiveTrip();
+      const compressed = typeof LZString !== 'undefined'
+        ? LZString.compressToEncodedURIComponent(JSON.stringify(trip))
+        : '';
+      return `${baseUrl}?mode=view#t=${compressed}`;
+    }
+
+    function copyCleanTripLink() {
+      const shareUrl = getCleanShareUrl();
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast(getFirebaseUrl()
+          ? '🔗 Read-Only Live Link copied! Friends can view updates but cannot edit.'
+          : '🔗 Read-Only Trip Link copied! (Setup Cloud Sync for auto-updates across devices)');
+      }).catch(() => {
+        prompt('Copy this link:', shareUrl);
+      });
+    }
+
+    function exportTripJson() {
+      const trip = getActiveTrip();
+      const blob = new Blob([JSON.stringify(trip, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = trip.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.json';
+      a.click();
+    }
+
+    function importTripJson(event) {
+      if (!isAdmin()) return openUnlockPrompt();
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!imported.name || !Array.isArray(imported.crew)) throw new Error('Invalid file');
+          imported.id = 'trip_' + Date.now();
+          appState.trips.unshift(imported);
+          appState.activeTripId = imported.id;
+          saveState();
+          showToast('⬆ Restored trip: ' + imported.name);
+        } catch {
+          alert('Invalid trip backup JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // --- Theme ---
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      html.classList.toggle('dark');
+      const isDark = html.classList.contains('dark');
+      document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
+      document.getElementById('themeLabel').textContent = isDark ? 'Day Mode' : 'Dusk Mode';
+    }
+
+    // --- Trip Meta & Crew ---
+    function saveTripMeta() {
+      if (!isAdmin()) return;
+      const trip = getActiveTrip();
+      trip.tripDates = document.getElementById('tripDatesDisplay').innerText.trim() || 'Upcoming Trip';
+      saveState();
+    }
+
+    function addCrewMember() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      const input = document.getElementById('newMemberInput');
+      const name = input.value.trim();
+      if (!name || trip.crew.includes(name)) return;
+      trip.crew.push(name);
+      input.value = '';
+      saveState();
+    }
+
+    function removeCrewMember(index) {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      if (trip.crew.length <= 1) return;
+      trip.crew.splice(index, 1);
+      saveState();
+    }
+
+    function renderCrew() {
+      const trip = getActiveTrip();
+      const admin = isAdmin();
+      document.getElementById('tripDatesDisplay').innerText = trip.tripDates;
+      document.getElementById('crewCount').innerText = trip.crew.length;
+      const list = document.getElementById('crewList');
+      list.innerHTML = trip.crew.map((member, idx) => `
+        <span class="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/25 px-3.5 py-1.5 rounded-full text-xs font-semibold">
+          <span>👤 ${escapeHtml(member)}</span>
+          ${admin ? `<button type="button" onclick="removeCrewMember(${idx})" class="text-white/75 hover:text-white ml-1 font-bold" title="Remove">&times;</button>` : ''}
+        </span>
+      `).join('');
+
+      const paidSelect = document.getElementById('expPaidBy');
+      paidSelect.innerHTML = trip.crew.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    }
+
+    // --- Audio Player (MP3 + Tone.js Fallback) ---
+    let isPlaying = false;
+    let synthLoop = null;
+    let synth = null;
+    let autoTriggered = false;
+
+    const mp3El = document.getElementById('mp3Player');
+
+    async function initSynth() {
+      if (synth || typeof Tone === 'undefined') return;
+      await Tone.start();
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.03, decay: 0.2, sustain: 0.3, release: 0.6 }
+      }).toDestination();
+      synth.volume.value = -10;
+    }
+
+    async function startSynthSequence() {
+      await initSynth();
+      if (!synth) return;
+      if (synthLoop) {
+        synthLoop.stop();
+        synthLoop.dispose();
+      }
+      const mode = document.getElementById('synthModeSelect').value;
+      const anthemNotes = [
+        ['E3', 'B3', 'E4'], ['E3', 'B3'], ['G3', 'D4'], ['A3', 'E4'],
+        ['E3', 'B3', 'E4'], ['D3', 'A3'], ['B2', 'F#3'], ['E3', 'B3']
+      ];
+      const lofiNotes = [
+        ['C4', 'E4', 'G4', 'B4'], ['A3', 'C4', 'E4', 'G4'],
+        ['F3', 'A3', 'C4', 'E4'], ['G3', 'B3', 'D4', 'F4']
+      ];
+      const pattern = mode === 'lofi' ? lofiNotes : anthemNotes;
+      let idx = 0;
+
+      Tone.Transport.bpm.value = mode === 'lofi' ? 82 : 128;
+      synthLoop = new Tone.Loop((time) => {
+        const chord = pattern[idx % pattern.length];
+        synth.triggerAttackRelease(chord, mode === 'lofi' ? '2n' : '8n', time);
+        idx++;
+      }, mode === 'lofi' ? '1m' : '4n').start(0);
+
+      Tone.Transport.start();
+    }
+
+    function stopAllAudio() {
+      mp3El.pause();
+      if (typeof Tone !== 'undefined') {
+        Tone.Transport.stop();
+      }
+    }
+
+    async function toggleAudio(forcePlay = false) {
+      const mode = document.getElementById('synthModeSelect').value;
+      if (forcePlay || !isPlaying) {
+        stopAllAudio();
+        isPlaying = true;
+        document.getElementById('playIcon').textContent = '⏸';
+        document.getElementById('playBtnText').textContent = 'Pause';
+        dismissBanner();
+
+        if (mode === 'mp3') {
+          try {
+            await mp3El.play();
+            return;
+          } catch (err) {
+            console.warn('MP3 fallback to synth:', err);
+          }
+        }
+        await startSynthSequence();
+      } else {
+        isPlaying = false;
+        stopAllAudio();
+        document.getElementById('playIcon').textContent = '▶';
+        document.getElementById('playBtnText').textContent = 'Play Track';
+      }
+    }
+
+    function switchSynthMode() {
+      const mode = document.getElementById('synthModeSelect').value;
+      if (mode === 'mp3') {
+        document.getElementById('nowPlayingTitle').textContent = 'Thalaivan Nirandharam (Jana Nayagan)';
+        document.getElementById('nowPlayingSub').textContent = 'Anirudh Ravichander, Vijay • Default Track';
+      } else {
+        document.getElementById('nowPlayingTitle').textContent = 'Road Trip Lo-Fi';
+        document.getElementById('nowPlayingSub').textContent = 'Ambient Travel Synth';
+      }
+      if (isPlaying) toggleAudio(true);
+    }
+
+    function dismissBanner() {
+      const banner = document.getElementById('audioPromptBanner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    function handleFirstClick() {
+      if (autoTriggered) return;
+      autoTriggered = true;
+      toggleAudio(true);
+    }
+    document.addEventListener('click', handleFirstClick, { once: true });
+
+    // --- Jukebox Queue ---
+    function addSong() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const title = document.getElementById('songTitle').value.trim();
+      const artist = document.getElementById('songArtist').value.trim() || 'Crew Pick';
+      const link = document.getElementById('songLink').value.trim();
+      const vibe = document.getElementById('songVibe').value;
+      if (!title) return;
+
+      appState.songs.push({
+        id: Date.now(),
+        title,
+        artist,
+        vibe,
+        link: link || ('https://www.youtube.com/results?search_query=' + encodeURIComponent(title + ' ' + artist)),
+        votes: 1
+      });
+      document.getElementById('songTitle').value = '';
+      document.getElementById('songArtist').value = '';
+      document.getElementById('songLink').value = '';
+      saveState();
+    }
+
+    function voteSong(id) {
+      const song = appState.songs.find(s => s.id === id);
+      if (song) {
+        song.votes += 1;
+        if (isAdmin()) saveState();
+        else renderSongs();
+      }
+    }
+
+    function playSongById(id) {
+      const song = appState.songs.find(s => s.id === id);
+      if (!song) return;
+      document.getElementById('nowPlayingTitle').textContent = song.title;
+      document.getElementById('nowPlayingSub').textContent = song.artist + ' • Now Playing';
+      toggleAudio(true);
+    }
+
+    function filterSongs(vibe) {
+      currentSongFilter = vibe;
+      renderSongs();
+    }
+
+    function renderSongs() {
+      const filtered = currentSongFilter === 'ALL'
+        ? appState.songs
+        : appState.songs.filter(s => s.vibe === currentSongFilter);
+      document.getElementById('songCount').innerText = filtered.length;
+
+      const list = document.getElementById('songQueueList');
+      list.innerHTML = filtered.map(song => `
+        <div class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-sand/70 dark:bg-slate-800/70 border ${song.isDefault ? 'border-terracotta/70' : 'border-slate-200/70 dark:border-slate-700'}">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-sm truncate">${escapeHtml(song.title)}</span>
+              ${song.isDefault ? '<span class="shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-terracotta text-white">Default Track</span>' : ''}
+            </div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">${escapeHtml(song.artist)} • <span class="text-ocean dark:text-cyan-400 font-semibold">${escapeHtml(song.vibe)}</span></div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="playSongById(${song.id})" class="px-2.5 py-1.5 rounded-xl bg-terracotta/15 text-terracotta hover:bg-terracotta hover:text-white text-xs font-bold transition">▶</button>
+            <a href="${escapeHtml(song.link)}" target="_blank" rel="noopener" class="px-2.5 py-1.5 rounded-xl bg-slate-200/80 dark:bg-slate-700 text-xs font-semibold hover:opacity-80">YT ↗</a>
+            <button type="button" onclick="voteSong(${song.id})" class="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold">▲ ${song.votes}</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // --- Saved Spots (Per Trip) ---
+    function setGuideTab(tab) {
+      currentGuideTab = tab;
+      document.querySelectorAll('.guide-tab').forEach(btn => {
+        btn.classList.remove('bg-ocean', 'text-white');
+        btn.classList.add('bg-slate-100', 'dark:bg-slate-800');
+      });
+      const active = document.getElementById('tab-' + tab);
+      if (active) {
+        active.classList.remove('bg-slate-100', 'dark:bg-slate-800');
+        active.classList.add('bg-ocean', 'text-white');
+      }
+      renderGuide();
+    }
+
+    function toggleAddSpotModal() {
+      if (!isAdmin()) return openUnlockPrompt();
+      document.getElementById('addSpotDrawer').classList.toggle('hidden');
+    }
+
+    function addCustomSpot() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      const category = document.getElementById('spotCategory').value;
+      const name = document.getElementById('spotName').value.trim();
+      const tag = document.getElementById('spotTag').value.trim() || 'Crew Pick';
+      const desc = document.getElementById('spotDesc').value.trim() || 'Saved to trip itinerary.';
+      if (!name) return;
+
+      trip.spots.unshift({ category, name, tag, desc });
+      document.getElementById('spotName').value = '';
+      document.getElementById('spotTag').value = '';
+      document.getElementById('spotDesc').value = '';
+      toggleAddSpotModal();
+      setGuideTab(category);
+      saveState();
+    }
+
+    function renderGuide() {
+      const trip = getActiveTrip();
+      const items = trip.spots.filter(s => s.category === currentGuideTab);
+      const grid = document.getElementById('guideCardsGrid');
+      grid.innerHTML = items.length ? items.map(spot => `
+        <div class="p-5 rounded-2xl bg-sand/80 dark:bg-slate-800/75 border border-amber-200/70 dark:border-slate-700 flex flex-col justify-between gap-3 hover:border-terracotta/50 transition">
+          <div>
+            <span class="inline-block text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-ocean/10 dark:bg-cyan-950 text-ocean dark:text-cyan-300 mb-2">${escapeHtml(spot.tag)}</span>
+            <h3 class="text-lg font-bold">${escapeHtml(spot.name)}</h3>
+            <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">${escapeHtml(spot.desc)}</p>
+          </div>
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.name + ' ' + trip.name)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-bold text-terracotta hover:underline mt-2">
+            Open in Google Maps ↗
+          </a>
+        </div>
+      `).join('') : '<div class="text-sm text-slate-500 col-span-3">No spots saved in this category yet.</div>';
+    }
+
+    // --- Expenses, Analysis & Settlements (Per Trip) ---
+    function addExpense() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      const title = document.getElementById('expTitle').value.trim();
+      const amount = parseFloat(document.getElementById('expAmount').value);
+      const category = document.getElementById('expCategory').value;
+      const paidBy = document.getElementById('expPaidBy').value;
+
+      if (!title || isNaN(amount) || amount <= 0) return;
+
+      trip.expenses.unshift({ id: Date.now(), title, amount, category, paidBy });
+      document.getElementById('expTitle').value = '';
+      document.getElementById('expAmount').value = '';
+      saveState();
+    }
+
+    function deleteExpense(id) {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      trip.expenses = trip.expenses.filter(e => e.id !== id);
+      saveState();
+    }
+
+    function calculateSettlements() {
+      const trip = getActiveTrip();
+      const total = trip.expenses.reduce((sum, e) => sum + e.amount, 0);
+      const share = trip.crew.length ? total / trip.crew.length : 0;
+
+      document.getElementById('heroTotalSpend').innerText = '₹' + total.toLocaleString('en-IN');
+      document.getElementById('heroPerPerson').innerText = '₹' + Math.round(share).toLocaleString('en-IN');
+
+      const catTotals = {};
+      trip.expenses.forEach(e => {
+        catTotals[e.category] = (catTotals[e.category] || 0) + e.amount;
+      });
+      const catBar = document.getElementById('categoryBreakdownBar');
+      const catEntries = Object.entries(catTotals);
+      catBar.innerHTML = catEntries.length ? catEntries.map(([cat, amt]) => `
+        <div class="bg-sand/80 dark:bg-slate-800/80 border border-amber-200/60 dark:border-slate-700 rounded-2xl px-3.5 py-2.5">
+          <div class="text-[11px] text-slate-500 dark:text-slate-400 truncate">${escapeHtml(cat)}</div>
+          <div class="text-sm font-bold text-slate-900 dark:text-white mt-0.5">₹${amt.toLocaleString('en-IN')}</div>
+        </div>
+      `).join('') : '';
+
+      const paidMap = {};
+      const balances = {};
+      trip.crew.forEach(m => {
+        paidMap[m] = 0;
+        balances[m] = -share;
+      });
+      trip.expenses.forEach(e => {
+        if (balances[e.paidBy] !== undefined) {
+          paidMap[e.paidBy] += e.amount;
+          balances[e.paidBy] += e.amount;
+        }
+      });
+
+      const memberGrid = document.getElementById('memberStatsGrid');
+      memberGrid.innerHTML = trip.crew.map(m => {
+        const net = Math.round(balances[m]);
+        const statusClass = net > 0 ? 'text-emerald-600 dark:text-emerald-400' : (net < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500');
+        const statusLabel = net > 0 ? `Gets ₹${net.toLocaleString('en-IN')}` : (net < 0 ? `Owes ₹${Math.abs(net).toLocaleString('en-IN')}` : 'Settled');
+        return `
+          <div class="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200/70 dark:border-slate-700 flex items-center justify-between gap-2">
+            <div>
+              <div class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(m)}</div>
+              <div class="text-[11px] text-slate-400">Paid ₹${Math.round(paidMap[m]).toLocaleString('en-IN')}</div>
+            </div>
+            <span class="font-bold ${statusClass}">${statusLabel}</span>
+          </div>
+        `;
+      }).join('');
+
+      const debtors = [];
+      const creditors = [];
+      Object.entries(balances).forEach(([person, bal]) => {
+        if (bal < -1) debtors.push({ person, amount: -bal });
+        else if (bal > 1) creditors.push({ person, amount: bal });
+      });
+
+      const txns = [];
+      let i = 0, j = 0;
+      while (i < debtors.length && j < creditors.length) {
+        const pay = Math.min(debtors[i].amount, creditors[j].amount);
+        txns.push(debtors[i].person + ' → ' + creditors[j].person + ': ₹' + Math.round(pay).toLocaleString('en-IN'));
+        debtors[i].amount -= pay;
+        creditors[j].amount -= pay;
+        if (debtors[i].amount < 1) i++;
+        if (creditors[j].amount < 1) j++;
+      }
+
+      const container = document.getElementById('settlementList');
+      container.innerHTML = txns.length
+        ? txns.map(t => `<div class="font-semibold text-slate-700 dark:text-slate-200">💸 ${escapeHtml(t)}</div>`).join('')
+        : '<div class="text-slate-500 text-xs">All settled up!</div>';
+      return { total, share, txns, trip };
+    }
+
+    function renderExpenses() {
+      const trip = getActiveTrip();
+      const admin = isAdmin();
+      const list = document.getElementById('expenseList');
+      list.innerHTML = trip.expenses.length ? trip.expenses.map(exp => `
+        <div class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-sand/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700">
+          <div>
+            <div class="font-bold text-sm">${escapeHtml(exp.title)}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${escapeHtml(exp.category)} • Paid by <strong class="text-ocean dark:text-cyan-400">${escapeHtml(exp.paidBy)}</strong></div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-bold text-sm">₹${exp.amount.toLocaleString('en-IN')}</span>
+            ${admin ? `<button type="button" onclick="deleteExpense(${exp.id})" class="text-rose-500 hover:text-rose-700 text-base font-bold px-1.5" title="Delete">&times;</button>` : ''}
+          </div>
+        </div>
+      `).join('') : '<div class="text-xs text-slate-400 py-2">No expenses logged for this trip yet.</div>';
+      calculateSettlements();
+    }
+
+    function copyWhatsAppSummary() {
+      const { total, share, txns, trip } = calculateSettlements();
+      const shareUrl = getCleanShareUrl();
+      const lines = [
+        `🧭 *${trip.name} — Trip Analysis*`,
+        `Total Spend: ₹${total.toLocaleString('en-IN')} (₹${Math.round(share).toLocaleString('en-IN')}/person)`,
+        '',
+        '*Settlements:*',
+        ...(txns.length ? txns : ['All settled!']),
+        '',
+        `🔗 View Live Breakdown: ${shareUrl}`
+      ];
+      navigator.clipboard.writeText(lines.join('\n'));
+      showToast('📋 WhatsApp summary copied!');
+    }
+
+    // --- Calculator ---
+    function calcInput(val) {
+      calcExpression += val;
+      document.getElementById('calcDisplay').innerText = calcExpression;
+    }
+
+    function calcClear() {
+      calcExpression = '';
+      document.getElementById('calcHistory').innerText = '';
+      document.getElementById('calcDisplay').innerText = '0';
+    }
+
+    function calcBackspace() {
+      calcExpression = calcExpression.slice(0, -1);
+      document.getElementById('calcDisplay').innerText = calcExpression || '0';
+    }
+
+    function calcEquals() {
+      try {
+        if (!/^[0-9+\-*/.() ]+$/.test(calcExpression)) return;
+        const result = Function('"use strict";return (' + calcExpression + ')')();
+        document.getElementById('calcHistory').innerText = calcExpression + ' =';
+        calcExpression = String(Math.round(result * 100) / 100);
+        document.getElementById('calcDisplay').innerText = calcExpression;
+      } catch (e) {
+        document.getElementById('calcDisplay').innerText = 'Error';
+        calcExpression = '';
+      }
+    }
+
+    function sendCalcToExpense() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const val = parseFloat(document.getElementById('calcDisplay').innerText);
+      if (!isNaN(val) && val > 0) {
+        document.getElementById('expAmount').value = val;
+        document.getElementById('expTitle').focus();
+      }
+    }
+
+    // --- Notes & Checklist (Per Trip) ---
+    function saveNotes() {
+      if (!isAdmin()) return;
+      const trip = getActiveTrip();
+      trip.notes = document.getElementById('tripNotes').value;
+      appState.updatedAt = Date.now();
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      } catch (e) {}
+      pushToCloud();
+      const badge = document.getElementById('notesSavedBadge');
+      badge.innerText = 'Saving...';
+      setTimeout(() => badge.innerText = 'Auto-saved', 500);
+    }
+
+    function addCheckItem() {
+      if (!isAdmin()) return openUnlockPrompt();
+      const trip = getActiveTrip();
+      const input = document.getElementById('newCheckInput');
+      const text = input.value.trim();
+      if (!text) return;
+      trip.checklist.push({ id: Date.now(), text, done: false });
+      input.value = '';
+      saveState();
+    }
+
+    function toggleCheckItem(id) {
+      if (!isAdmin()) {
+        renderNotesAndChecklist();
+        return openUnlockPrompt();
+      }
+      const trip = getActiveTrip();
+      const item = trip.checklist.find(c => c.id === id);
+      if (item) {
+        item.done = !item.done;
+        saveState();
+      }
+    }
+
+    function renderNotesAndChecklist() {
+      const trip = getActiveTrip();
+      const admin = isAdmin();
+      document.getElementById('tripNotes').value = trip.notes;
+      const container = document.getElementById('checklistContainer');
+      container.innerHTML = trip.checklist.map(item => `
+        <label class="flex items-center gap-3 p-3 rounded-xl bg-sand/70 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700 ${admin ? 'cursor-pointer' : 'cursor-default'}">
+          <input type="checkbox" ${item.done ? 'checked' : ''} ${admin ? '' : 'disabled'} onchange="toggleCheckItem(${item.id})" class="w-4 h-4 accent-terracotta rounded" />
+          <span class="text-sm ${item.done ? 'line-through text-slate-400' : ''}">${escapeHtml(item.text)}</span>
+        </label>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderAll() {
+      updateCloudBadge();
+      renderTripSelector();
+      renderCrew();
+      renderExpenses();
+      renderGuide();
+      renderSongs();
+      renderNotesAndChecklist();
+    }
+
+    // Boot
+    loadCompactHashTrip();
+    applyAdminPermissions();
+    renderAll();
+    pullFromCloud(false);
+
+    // Auto-refresh from cloud every 10 seconds when Live Cloud Sync is active
+    setInterval(() => {
+      if (getFirebaseUrl() && document.activeElement?.id !== 'tripNotes') {
+        pullFromCloud(true);
+      }
+    }, 10000);
+  </script>
+</body>
+</html>
